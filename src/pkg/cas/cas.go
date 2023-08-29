@@ -20,9 +20,12 @@ type Config struct {
 	DisplayName     string
 	CoverAttributes bool
 	Attributes      struct {
-		Nickname string
-		Phone    string
-		Email    string
+		Nickname    string
+		Phone       string
+		Email       string
+		Department  string
+		CompanyAbbr string
+		CompanyName string
 	}
 	DefaultRoles []string
 }
@@ -33,9 +36,12 @@ type ssoClient struct {
 	callbackAddr string
 	displayName  string
 	attributes   struct {
-		nickname string
-		phone    string
-		email    string
+		nickname    string
+		phone       string
+		email       string
+		department  string
+		companyAbbr string
+		companyName string
 	}
 }
 
@@ -55,6 +61,9 @@ func Init(cf Config) {
 	cli.attributes.nickname = cf.Attributes.Nickname
 	cli.attributes.phone = cf.Attributes.Phone
 	cli.attributes.email = cf.Attributes.Email
+	cli.attributes.department = cf.Attributes.Department
+	cli.attributes.companyAbbr = cf.Attributes.CompanyAbbr
+	cli.attributes.companyName = cf.Attributes.CompanyName
 }
 
 func GetDisplayName() string {
@@ -115,6 +124,9 @@ type CallbackOutput struct {
 	Nickname    string `json:"nickname"`
 	Phone       string `yaml:"phone"`
 	Email       string `yaml:"email"`
+	Department  string `yaml:"department"`
+	CompanyAbbr string `yaml:"company_abbr"`
+	CompanyName string `yaml:"company_name"`
 }
 
 func ValidateServiceTicket(ctx context.Context, ticket, state string) (ret *CallbackOutput, err error) {
@@ -146,6 +158,12 @@ func ValidateServiceTicket(ctx context.Context, ticket, state string) (ret *Call
 	logger.Debugf("CAS Authentication Response's Attributes--[Email]: %s", ret.Email)
 	ret.Phone = authRet.Attributes.Get(cli.attributes.phone)
 	logger.Debugf("CAS Authentication Response's Attributes--[Phone]: %s", ret.Phone)
+	ret.Department = authRet.Attributes.Get(cli.attributes.department)
+	logger.Debugf("CAS Authentication Response's Attributes--[Department]: %s", ret.Department)
+	ret.CompanyAbbr = authRet.Attributes.Get(cli.attributes.companyAbbr)
+	logger.Debugf("CAS Authentication Response's Attributes--[CompanyAbbr]: %s", ret.CompanyAbbr)
+	ret.CompanyName = authRet.Attributes.Get(cli.attributes.companyName)
+	logger.Debugf("CAS Authentication Response's Attributes--[CompanyName]: %s", ret.CompanyName)
 	ret.Redirect, err = fetchRedirect(ctx, state)
 	if err != nil {
 		logger.Debugf("get redirect err:%s state:%s", state, err)

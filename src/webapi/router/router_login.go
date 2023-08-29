@@ -317,7 +317,8 @@ func loginCallbackCas(c *gin.Context) {
 		ginx.NewRender(c).Data("", err)
 		return
 	}
-	user, err := models.UserGet("username=?", ret.Username)
+	username := ret.Username + "_" + ret.CompanyAbbr
+	user, err := models.UserGet("username=?", username)
 	if err != nil {
 		logger.Errorf("UserGet: %s", err)
 	}
@@ -335,26 +336,38 @@ func loginCallbackCas(c *gin.Context) {
 			if ret.Phone != "" {
 				user.Phone = ret.Phone
 			}
-
+			if ret.Department != "" {
+				user.Department = ret.Department
+			}
+			if ret.CompanyAbbr != "" {
+				user.CompanyAbbr = ret.CompanyAbbr
+			}
+			if ret.CompanyName != "" {
+				user.CompanyName = ret.CompanyName
+			}
 			user.UpdateAt = time.Now().Unix()
-			ginx.Dangerous(user.Update("email", "nickname", "phone", "update_at"))
+			ginx.Dangerous(user.Update("email", "nickname", "phone", "update_at", "department", "company_abbr", "company_name"))
 		}
 	} else {
 		now := time.Now().Unix()
 		user = &models.User{
-			Username: ret.Username,
-			Password: "******",
-			Nickname: ret.Nickname,
-			Portrait: "",
-			Roles:    strings.Join(config.C.CAS.DefaultRoles, " "),
-			RolesLst: config.C.CAS.DefaultRoles,
-			Contacts: []byte("{}"),
-			Phone:    ret.Phone,
-			Email:    ret.Email,
-			CreateAt: now,
-			UpdateAt: now,
-			CreateBy: "CAS",
-			UpdateBy: "CAS",
+			User:        ret.Username,
+			Username:    username,
+			Password:    "******",
+			Nickname:    ret.Nickname,
+			Portrait:    "",
+			Roles:       strings.Join(config.C.CAS.DefaultRoles, " "),
+			RolesLst:    config.C.CAS.DefaultRoles,
+			Contacts:    []byte("{}"),
+			Phone:       ret.Phone,
+			Email:       ret.Email,
+			CreateAt:    now,
+			UpdateAt:    now,
+			CreateBy:    "CAS",
+			UpdateBy:    "CAS",
+			Department:  ret.Department,
+			CompanyName: ret.CompanyName,
+			CompanyAbbr: ret.CompanyAbbr,
 		}
 		// create user from cas
 		ginx.Dangerous(user.Add())

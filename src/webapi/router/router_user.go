@@ -18,7 +18,8 @@ func userFindAll(c *gin.Context) {
 	total, err := models.UserTotal(query)
 	ginx.Dangerous(err)
 
-	list, err := models.UserGets(query, limit, ginx.Offset(c, limit))
+	user := c.MustGet("user").(*models.User)
+	list, err := models.UserGets(query, limit, ginx.Offset(c, limit), user.CompanyAbbr)
 	ginx.Dangerous(err)
 
 	ginx.NewRender(c).Data(gin.H{
@@ -34,10 +35,9 @@ func userGets(c *gin.Context) {
 	total, err := models.UserTotal(query)
 	ginx.Dangerous(err)
 
-	list, err := models.UserGets(query, limit, ginx.Offset(c, limit))
-	ginx.Dangerous(err)
-
 	user := c.MustGet("user").(*models.User)
+	list, err := models.UserGets(query, limit, ginx.Offset(c, limit), user.CompanyAbbr)
+	ginx.Dangerous(err)
 
 	ginx.NewRender(c).Data(gin.H{
 		"list":  list,

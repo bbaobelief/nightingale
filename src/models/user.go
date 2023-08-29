@@ -34,22 +34,26 @@ const (
 )
 
 type User struct {
-	Id         int64        `json:"id" gorm:"primaryKey"`
-	Username   string       `json:"username"`
-	Nickname   string       `json:"nickname"`
-	Password   string       `json:"-"`
-	Phone      string       `json:"phone"`
-	Email      string       `json:"email"`
-	Portrait   string       `json:"portrait"`
-	Roles      string       `json:"-"`              // 这个字段写入数据库
-	RolesLst   []string     `json:"roles" gorm:"-"` // 这个字段和前端交互
-	Contacts   ormx.JSONObj `json:"contacts"`       // 内容为 map[string]string 结构
-	Maintainer int          `json:"maintainer"`     // 是否给管理员发消息 0:not send 1:send
-	CreateAt   int64        `json:"create_at"`
-	CreateBy   string       `json:"create_by"`
-	UpdateAt   int64        `json:"update_at"`
-	UpdateBy   string       `json:"update_by"`
-	Admin      bool         `json:"admin" gorm:"-"` // 方便前端使用
+	Id          int64        `json:"id" gorm:"primaryKey"`
+	User        string       `json:"user"`
+	Username    string       `json:"username"`
+	Nickname    string       `json:"nickname"`
+	Password    string       `json:"-"`
+	Phone       string       `json:"phone"`
+	Email       string       `json:"email"`
+	Department  string       `json:"department"`
+	CompanyAbbr string       `json:"company_abbr"`
+	CompanyName string       `json:"company_name"`
+	Portrait    string       `json:"portrait"`
+	Roles       string       `json:"-"`              // 这个字段写入数据库
+	RolesLst    []string     `json:"roles" gorm:"-"` // 这个字段和前端交互
+	Contacts    ormx.JSONObj `json:"contacts"`       // 内容为 map[string]string 结构
+	Maintainer  int          `json:"maintainer"`     // 是否给管理员发消息 0:not send 1:send
+	CreateAt    int64        `json:"create_at"`
+	CreateBy    string       `json:"create_by"`
+	UpdateAt    int64        `json:"update_at"`
+	UpdateBy    string       `json:"update_by"`
+	Admin       bool         `json:"admin" gorm:"-"` // 方便前端使用
 }
 
 func (u *User) TableName() string {
@@ -318,15 +322,15 @@ func UserTotal(query string) (num int64, err error) {
 	return num, nil
 }
 
-func UserGets(query string, limit, offset int) ([]User, error) {
-	session := DB().Limit(limit).Offset(offset).Order("username")
+func UserGets(query string, limit, offset int, companyAbbr string) ([]User, error) {
+	session := DB().Where("company_abbr = ?", companyAbbr).Limit(limit).Offset(offset).Order("username")
 	if query != "" {
 		q := "%" + query + "%"
 		session = session.Where("username like ? or nickname like ? or phone like ? or email like ?", q, q, q, q)
 	}
 
 	var users []User
-	err := session.Find(&users).Error
+	err := session.Debug().Find(&users).Error
 	if err != nil {
 		return users, errors.WithMessage(err, "failed to query user")
 	}
