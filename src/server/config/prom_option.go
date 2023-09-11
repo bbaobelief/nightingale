@@ -7,7 +7,7 @@ import (
 )
 
 type PromOption struct {
-	ClusterName   string
+	//ClusterName   string
 	Url           string
 	BasicAuthUser string
 	BasicAuthPass string

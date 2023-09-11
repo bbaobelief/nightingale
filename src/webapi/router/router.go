@@ -148,7 +148,7 @@ func configRoute(r *gin.Engine, version string) {
 		pages.GET("/roles", rolesGets)
 		pages.GET("/notify-channels", notifyChannelsGets)
 		pages.GET("/contact-keys", contactKeysGets)
-		pages.GET("/clusters", clustersGets)
+		pages.GET("/clusters", auth(), user(), clustersGets)
 
 		pages.GET("/self/perms", auth(), user(), permsGets)
 		pages.GET("/self/profile", auth(), user(), selfProfileGet)
@@ -275,10 +275,10 @@ func configRoute(r *gin.Engine, version string) {
 		}
 
 		// card logic
-		pages.GET("/alert-cur-events/list", auth(), alertCurEventsList)
+		pages.GET("/alert-cur-events/list", auth(), user(), alertCurEventsList)
 		pages.GET("/alert-cur-events/card", auth(), alertCurEventsCard)
 		pages.POST("/alert-cur-events/card/details", auth(), alertCurEventsCardDetails)
-		pages.GET("/alert-his-events/list", auth(), alertHisEventsList)
+		pages.GET("/alert-his-events/list", auth(), user(), alertHisEventsList)
 		pages.DELETE("/alert-cur-events", auth(), user(), perm("/alert-cur-events/del"), alertCurEventDel)
 
 		pages.GET("/alert-aggr-views", auth(), alertAggrViewGets)
@@ -330,8 +330,8 @@ func configRoute(r *gin.Engine, version string) {
 		service.POST("/alert-mutes", alertMuteAddByService)
 		service.DELETE("/alert-mutes", alertMuteDel)
 
-		service.GET("/alert-cur-events", alertCurEventsList)
-		service.GET("/alert-his-events", alertHisEventsList)
+		service.GET("/alert-cur-events", auth(), user(), alertCurEventsList)
+		service.GET("/alert-his-events", auth(), user(), alertHisEventsList)
 		service.GET("/alert-his-event/:eid", alertHisEventGet)
 
 		service.GET("/config/:id", configGet)

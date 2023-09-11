@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"net"
 	"os"
 	"path"
 	"plugin"
@@ -70,29 +69,23 @@ func DealConfigCrypto(key string) {
 	}
 	C.Ibex.BasicAuthPass = decryptIbexPwd
 
-	if len(C.Readers) == 0 {
-		C.Reader.ClusterName = C.ClusterName
-		C.Readers = append(C.Readers, C.Reader)
-	}
-
-	for index, v := range C.Readers {
-		decryptReaderPwd, err := secu.DealWithDecrypt(v.BasicAuthPass, key)
+	for _, cluster := range C.Clusters {
+		decryptReaderPwd, err := secu.DealWithDecrypt(cluster.Reader.BasicAuthPass, key)
 		if err != nil {
-			fmt.Printf("failed to decrypt the reader password: %s , error: %s", v.BasicAuthPass, err.Error())
+			fmt.Printf("failed to decrypt the reader password: %s , error: %s", cluster.Reader.BasicAuthPass, err.Error())
 			os.Exit(1)
 		}
-		C.Readers[index].BasicAuthPass = decryptReaderPwd
-	}
+		cluster.Reader.BasicAuthPass = decryptReaderPwd
 
-	for index, v := range C.Writers {
-		decryptWriterPwd, err := secu.DealWithDecrypt(v.BasicAuthPass, key)
-		if err != nil {
-			fmt.Printf("failed to decrypt the writer password: %s , error: %s", v.BasicAuthPass, err.Error())
-			os.Exit(1)
+		for index, v := range cluster.Writers {
+			decryptWriterPwd, err := secu.DealWithDecrypt(v.BasicAuthPass, key)
+			if err != nil {
+				fmt.Printf("failed to decrypt the writer password: %s , error: %s", v.BasicAuthPass, err.Error())
+				os.Exit(1)
+			}
+			cluster.Writers[index].BasicAuthPass = decryptWriterPwd
 		}
-		C.Writers[index].BasicAuthPass = decryptWriterPwd
 	}
-
 }
 
 func MustLoad(key string, fpaths ...string) {
@@ -144,16 +137,12 @@ func MustLoad(key string, fpaths ...string) {
 			C.ReaderFrom = "config"
 		}
 
-		if C.ReaderFrom == "config" && C.ClusterName == "" {
-			fmt.Println("configuration ClusterName is blank")
+		if C.ReaderFrom == "config" && len(C.Clusters) == 0 {
+			fmt.Println("configuration Cluster is blank")
 			os.Exit(1)
 		}
 
 		if C.Heartbeat.IP == "" {
-			// auto detect
-			// C.Heartbeat.IP = fmt.Sprint(GetOutboundIP())
-			// 自动获取IP在有些环境下容易出错，这里用hostname+pid来作唯一标识
-
 			hostname, err := os.Hostname()
 			if err != nil {
 				fmt.Println("failed to get hostname:", err)
@@ -165,11 +154,6 @@ func MustLoad(key string, fpaths ...string) {
 			}
 
 			C.Heartbeat.IP = hostname
-
-			// if C.Heartbeat.IP == "" {
-			// 	fmt.Println("heartbeat ip auto got is blank")
-			// 	os.Exit(1)
-			// }
 		}
 
 		C.Heartbeat.Endpoint = fmt.Sprintf("%s:%d", C.Heartbeat.IP, C.HTTP.Port)
@@ -192,33 +176,31 @@ func MustLoad(key string, fpaths ...string) {
 			C.WriterOpt.ShardingKey = "ident"
 		}
 
-		for i, write := range C.Writers {
-			if C.Writers[i].ClusterName == "" {
-				C.Writers[i].ClusterName = C.ClusterName
-			}
+		for _, cluster := range C.Clusters {
+			for _, write := range cluster.Writers {
+				for _, relabel := range write.WriteRelabels {
+					regex, ok := relabel.Regex.(string)
+					if !ok {
+						log.Println("Regex field must be a string")
+						os.Exit(1)
+					}
 
-			for _, relabel := range write.WriteRelabels {
-				regex, ok := relabel.Regex.(string)
-				if !ok {
-					log.Println("Regex field must be a string")
-					os.Exit(1)
-				}
+					if regex == "" {
+						regex = "(.*)"
+					}
+					relabel.Regex = models.MustNewRegexp(regex)
 
-				if regex == "" {
-					regex = "(.*)"
-				}
-				relabel.Regex = models.MustNewRegexp(regex)
+					if relabel.Separator == "" {
+						relabel.Separator = ";"
+					}
 
-				if relabel.Separator == "" {
-					relabel.Separator = ";"
-				}
+					if relabel.Action == "" {
+						relabel.Action = "replace"
+					}
 
-				if relabel.Action == "" {
-					relabel.Action = "replace"
-				}
-
-				if relabel.Replacement == "" {
-					relabel.Replacement = "$1"
+					if relabel.Replacement == "" {
+						relabel.Replacement = "$1"
+					}
 				}
 			}
 		}
@@ -230,7 +212,6 @@ func MustLoad(key string, fpaths ...string) {
 
 type Config struct {
 	RunMode            string
-	ClusterName        string // 监控对象上报时，指定的集群名称
 	BusiGroupLabelKey  string
 	EngineDelay        int64
 	DisableUsageReport bool
@@ -247,14 +228,17 @@ type Config struct {
 	Redis              storage.RedisConfig
 	DB                 ormx.DBConfig
 	WriterOpt          WriterGlobalOpt
-	Writers            []WriterOptions
-	Reader             PromOption
-	Readers            []PromOption
+	Clusters           []Clusters
 	Ibex               Ibex
 }
 
+type Clusters struct {
+	Name    string
+	Reader  PromOption
+	Writers []WriterOptions
+}
+
 type WriterOptions struct {
-	ClusterName   string
 	Url           string
 	BasicAuthUser string
 	BasicAuthPass string
@@ -433,18 +417,4 @@ type Ibex struct {
 
 func (c *Config) IsDebugMode() bool {
 	return c.RunMode == "debug"
-}
-
-// Get preferred outbound ip of this machine
-func GetOutboundIP() net.IP {
-	conn, err := net.Dial("udp", "223.5.5.5:80")
-	if err != nil {
-		fmt.Println("auto get outbound ip fail:", err)
-		os.Exit(1)
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP
 }

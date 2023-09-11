@@ -24,6 +24,11 @@ func targetGets(c *gin.Context) {
 	mins := ginx.QueryInt(c, "mins", 2)
 	clusters := queryClusters(c)
 
+	user := c.MustGet("user").(*models.User)
+	if !user.IsAdmin() {
+		clusters = append(clusters, strings.ToUpper(user.CompanyAbbr))
+	}
+
 	total, err := models.TargetTotal(bgid, clusters, query)
 	ginx.Dangerous(err)
 

@@ -86,8 +86,8 @@ func configRoute(r *gin.Engine, version string, reloadFunc func()) {
 
 	r.POST("/opentsdb/put", stat(), handleOpenTSDB)
 	r.POST("/openfalcon/push", stat(), falconPush)
-	r.POST("/prometheus/v1/write", stat(), remoteWrite)
-	r.POST("/prometheus/v1/query", stat(), queryPromql)
+	//r.POST("/prometheus/v1/write", stat(), remoteWrite)
+	//r.POST("/prometheus/v1/query", stat(), queryPromql)
 
 	r.GET("/memory/alert-rule", alertRuleGet)
 	r.GET("/memory/alert-rule-location", alertRuleLocationGet)

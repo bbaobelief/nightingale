@@ -3,6 +3,8 @@ package idents
 import (
 	"context"
 	"fmt"
+	"github.com/didi/nightingale/v5/src/pkg/cmdb"
+	"github.com/didi/nightingale/v5/src/server/writer"
 	"strconv"
 	"time"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/didi/nightingale/v5/src/server/config"
 	"github.com/didi/nightingale/v5/src/server/memsto"
 	"github.com/didi/nightingale/v5/src/server/naming"
-	"github.com/didi/nightingale/v5/src/server/writer"
 	"github.com/didi/nightingale/v5/src/storage"
 )
 
@@ -30,18 +31,32 @@ func loopToRedis(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(duration):
-			toRedis()
+			toClustersRedis()
 		}
 	}
 }
 
-func toRedis() {
-	items := Idents.Items()
+// 按cluster拆分
+func toClustersRedis() {
+	data := make(map[string]map[string]interface{})
+	for host, ts := range Idents.Items() {
+		cluster := cmdb.HostToCluster(host)
+		if _, ok := data[cluster]; !ok {
+			data[cluster] = make(map[string]interface{})
+		}
+		data[cluster][host] = ts
+	}
+	for cluster, items := range data {
+		toRedis(cluster, items)
+	}
+}
+
+func toRedis(clusterName string, items map[string]interface{}) {
 	if len(items) == 0 {
 		return
 	}
 
-	if config.ReaderClients.IsNil(config.C.ClusterName) {
+	if config.ReaderClients.IsNil(clusterName) {
 		return
 	}
 
@@ -53,7 +68,7 @@ func toRedis() {
 			Idents.Remove(key)
 		} else {
 			// use now as timestamp to redis
-			err := storage.Redis.HSet(context.Background(), redisKey(config.C.ClusterName), key, now).Err()
+			err := storage.Redis.HSet(context.Background(), redisKey(clusterName), key, now).Err()
 			if err != nil {
 				logger.Errorf("redis hset idents failed: %v", err)
 			}
@@ -62,10 +77,11 @@ func toRedis() {
 }
 
 // hash struct:
-// /idents/Default -> {
-//     $ident => $timestamp
-//     $ident => $timestamp
-// }
+//
+//	/idents/Default -> {
+//	    $ident => $timestamp
+//	    $ident => $timestamp
+//	}
 func redisKey(cluster string) string {
 	return fmt.Sprintf("/idents/%s", cluster)
 }
@@ -90,13 +106,18 @@ func loopPushMetrics(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(duration):
-			pushMetrics()
+			pushClustersMetrics()
 		}
 	}
 }
 
-func pushMetrics() {
-	clusterName := config.C.ClusterName
+// 按cluster拆分
+func pushClustersMetrics() {
+	for _, cluster := range config.C.Clusters {
+		pushMetrics(cluster.Name)
+	}
+}
+func pushMetrics(clusterName string) {
 	isLeader, err := naming.IamLeader(clusterName)
 	if err != nil {
 		logger.Errorf("handle_idents: %v", err)
@@ -173,7 +194,7 @@ func pushMetrics() {
 			common.AppendLabels(pt, target)
 		}
 
-		writer.Writers.PushSample("target_up", pt)
+		writer.Writers.PushSample("target_up", pt, clusterName)
 	}
 
 	// 把actives传给TargetCache，看看除了active的部分，还有别的target么？有的话返回，设置target_up = 0
@@ -201,6 +222,6 @@ func pushMetrics() {
 		})
 
 		common.AppendLabels(pt, dead)
-		writer.Writers.PushSample("target_up", pt)
+		writer.Writers.PushSample("target_up", pt, clusterName)
 	}
 }

@@ -1,5 +1,6 @@
 package naming
 
+import "C"
 import (
 	"context"
 	"fmt"
@@ -42,11 +43,11 @@ func heartbeat() error {
 	var err error
 	if config.C.ReaderFrom == "config" {
 		// 在配置文件维护实例和集群的对应关系
-		for i := 0; i < len(config.C.Readers); i++ {
-			clusters = append(clusters, config.C.Readers[i].ClusterName)
-			err := models.AlertingEngineHeartbeatWithCluster(config.C.Heartbeat.Endpoint, config.C.Readers[i].ClusterName)
+		for _, cluster := range config.C.Clusters {
+			clusters = append(clusters, cluster.Name)
+			err := models.AlertingEngineHeartbeatWithCluster(config.C.Heartbeat.Endpoint, cluster.Name)
 			if err != nil {
-				logger.Warningf("heartbeat with cluster %s err:%v", config.C.Readers[i].ClusterName, err)
+				logger.Warningf("heartbeat with cluster %s err:%v", cluster.Name, err)
 				continue
 			}
 		}
@@ -74,7 +75,7 @@ func heartbeat() error {
 	for i := 0; i < len(clusters); i++ {
 		servers, err := ActiveServers(clusters[i])
 		if err != nil {
-			logger.Warningf("hearbeat %s get active server err:", clusters[i], err)
+			logger.Warningf("hearbeat %s get active server err:%v", clusters[i], err)
 			continue
 		}
 

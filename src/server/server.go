@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/didi/nightingale/v5/src/server/writer"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -21,7 +22,6 @@ import (
 	"github.com/didi/nightingale/v5/src/server/router"
 	"github.com/didi/nightingale/v5/src/server/stat"
 	"github.com/didi/nightingale/v5/src/server/usage"
-	"github.com/didi/nightingale/v5/src/server/writer"
 	"github.com/didi/nightingale/v5/src/storage"
 )
 
@@ -126,7 +126,7 @@ func (s Server) initialize() (func(), error) {
 	}
 
 	// init prometheus remote writers
-	if err = writer.Init(config.C.Writers, config.C.WriterOpt); err != nil {
+	if err = writer.InitWriters(config.C.Clusters, config.C.WriterOpt); err != nil {
 		return fns.Ret(), err
 	}
 

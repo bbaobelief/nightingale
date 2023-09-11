@@ -1,5 +1,6 @@
 package memsto
 
+import "C"
 import (
 	"fmt"
 	"strings"
@@ -81,7 +82,7 @@ func (tc *TargetCacheType) GetDeads(actives map[string]struct{}) map[string]*mod
 }
 
 func SyncTargets() {
-	err := syncTargets()
+	err := syncClustersTargets()
 	if err != nil {
 		fmt.Println("failed to sync targets:", err)
 		exit(1)
@@ -94,16 +95,24 @@ func loopSyncTargets() {
 	duration := time.Duration(9000) * time.Millisecond
 	for {
 		time.Sleep(duration)
-		if err := syncTargets(); err != nil {
+		if err := syncClustersTargets(); err != nil {
 			logger.Warning("failed to sync targets:", err)
 		}
 	}
 }
 
-func syncTargets() error {
+func syncClustersTargets() error {
+	for _, cluster := range config.C.Clusters {
+		if err := syncTargets(cluster.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func syncTargets(clusterName string) error {
 	start := time.Now()
 
-	clusterName := config.C.ClusterName
 	if clusterName == "" {
 		TargetCache.Reset()
 		logger.Warning("cluster name is blank")

@@ -4,6 +4,9 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"fmt"
+	"github.com/didi/nightingale/v5/src/pkg/cmdb"
+	promstat "github.com/didi/nightingale/v5/src/server/stat"
+	"github.com/didi/nightingale/v5/src/server/writer"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -13,8 +16,6 @@ import (
 	"github.com/didi/nightingale/v5/src/server/config"
 	"github.com/didi/nightingale/v5/src/server/idents"
 	"github.com/didi/nightingale/v5/src/server/memsto"
-	promstat "github.com/didi/nightingale/v5/src/server/stat"
-	"github.com/didi/nightingale/v5/src/server/writer"
 	"github.com/gin-gonic/gin"
 	"github.com/mailru/easyjson"
 	"github.com/prometheus/common/model"
@@ -230,10 +231,10 @@ func datadogSeries(c *gin.Context) {
 	}
 
 	var (
-		succ int
 		fail int
 		msg  = "data pushed to queue"
 		ts   = time.Now().Unix()
+		succ = make(map[string]int)
 		ids  = make(map[string]interface{})
 	)
 
@@ -266,28 +267,28 @@ func datadogSeries(c *gin.Context) {
 			}
 		}
 
+		cluster := cmdb.HostToCluster(ident)
+
 		LogSample(c.Request.RemoteAddr, pt)
 		if config.C.WriterOpt.ShardingKey == "ident" {
 			if ident == "" {
-				writer.Writers.PushSample("-", pt)
+				writer.Writers.PushSample("-", pt, cluster)
 			} else {
-				writer.Writers.PushSample(ident, pt)
+				writer.Writers.PushSample(ident, pt, cluster)
 			}
 		} else {
-			writer.Writers.PushSample(item.Metric, pt)
+			writer.Writers.PushSample(item.Metric, pt, cluster)
 		}
 
-		succ++
+		succ[cluster]++
 	}
 
-	if succ > 0 {
-		cn := config.C.ClusterName
+	for cn, num := range succ {
 		if cn != "" {
-			promstat.CounterSampleTotal.WithLabelValues(cn, "datadog").Add(float64(succ))
+			promstat.CounterSampleTotal.WithLabelValues(cn, "datadog").Add(float64(num))
 		}
 		idents.Idents.MSet(ids)
 	}
-
 	c.JSON(200, gin.H{
 		"succ": succ,
 		"fail": fail,

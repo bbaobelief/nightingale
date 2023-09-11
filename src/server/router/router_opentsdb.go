@@ -3,6 +3,9 @@ package router
 import (
 	"compress/gzip"
 	"fmt"
+	"github.com/didi/nightingale/v5/src/pkg/cmdb"
+	"github.com/didi/nightingale/v5/src/server/idents"
+	promstat "github.com/didi/nightingale/v5/src/server/stat"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -15,9 +18,7 @@ import (
 
 	"github.com/didi/nightingale/v5/src/server/common"
 	"github.com/didi/nightingale/v5/src/server/config"
-	"github.com/didi/nightingale/v5/src/server/idents"
 	"github.com/didi/nightingale/v5/src/server/memsto"
-	promstat "github.com/didi/nightingale/v5/src/server/stat"
 	"github.com/didi/nightingale/v5/src/server/writer"
 	"github.com/mailru/easyjson"
 	_ "github.com/mailru/easyjson/gen"
@@ -168,10 +169,10 @@ func handleOpenTSDB(c *gin.Context) {
 	}
 
 	var (
-		succ int
 		fail int
 		msg  = "data pushed to queue"
 		ts   = time.Now().Unix()
+		succ = make(map[string]int)
 		ids  = make(map[string]interface{})
 	)
 
@@ -195,36 +196,37 @@ func handleOpenTSDB(c *gin.Context) {
 			continue
 		}
 
-		host, has := arr[i].Tags["ident"]
+		ident, has := arr[i].Tags["ident"]
 		if has {
-			// register host
-			ids[host] = ts
+			// register ident
+			ids[ident] = ts
 
 			// fill tags
-			target, has := memsto.TargetCache.Get(host)
+			target, has := memsto.TargetCache.Get(ident)
 			if has {
 				common.AppendLabels(pt, target)
 			}
 		}
 
+		cluster := cmdb.HostToCluster(ident)
+
 		LogSample(c.Request.RemoteAddr, pt)
 		if config.C.WriterOpt.ShardingKey == "ident" {
-			if host == "" {
-				writer.Writers.PushSample("-", pt)
+			if ident == "" {
+				writer.Writers.PushSample("-", pt, cluster)
 			} else {
-				writer.Writers.PushSample(host, pt)
+				writer.Writers.PushSample(ident, pt, cluster)
 			}
 		} else {
-			writer.Writers.PushSample(arr[i].Metric, pt)
+			writer.Writers.PushSample(arr[i].Metric, pt, cluster)
 		}
 
-		succ++
+		succ[cluster]++
 	}
 
-	if succ > 0 {
-		cn := config.C.ClusterName
+	for cn, num := range succ {
 		if cn != "" {
-			promstat.CounterSampleTotal.WithLabelValues(cn, "opentsdb").Add(float64(succ))
+			promstat.CounterSampleTotal.WithLabelValues(cn, "opentsdb").Add(float64(num))
 		}
 		idents.Idents.MSet(ids)
 	}

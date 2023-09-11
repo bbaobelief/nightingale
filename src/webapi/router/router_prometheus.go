@@ -2,7 +2,7 @@ package router
 
 import (
 	"context"
-
+	"github.com/didi/nightingale/v5/src/models"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -136,8 +136,15 @@ func prometheusProxy(c *gin.Context) {
 func clustersGets(c *gin.Context) {
 	count := len(config.C.Clusters)
 	names := make([]string, 0, count)
-	for i := 0; i < count; i++ {
-		names = append(names, config.C.Clusters[i].Name)
+	user := c.MustGet("user").(*models.User)
+
+	if !user.IsAdmin() {
+		abbr := strings.ToUpper(string(user.CompanyAbbr[0])) + user.CompanyAbbr[1:]
+		names = append(names, abbr)
+	} else {
+		for i := 0; i < count; i++ {
+			names = append(names, config.C.Clusters[i].Name)
+		}
 	}
 	ginx.NewRender(c).Data(names, nil)
 }

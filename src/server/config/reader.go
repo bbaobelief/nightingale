@@ -15,19 +15,20 @@ import (
 )
 
 func InitReader() error {
+	for _, cluster := range C.Clusters {
+		if err := initReader(cluster); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func initReader(cluster Clusters) error {
 	rf := strings.ToLower(strings.TrimSpace(C.ReaderFrom))
 	if rf == "" || rf == "config" {
-		if len(C.Readers) == 0 {
-			C.Reader.ClusterName = C.ClusterName
-			C.Readers = append(C.Readers, C.Reader)
-		}
-
-		for _, reader := range C.Readers {
-			err := setClientFromPromOption(reader.ClusterName, reader)
-			if err != nil {
-				logger.Errorf("failed to setClientFromPromOption: %v", err)
-				continue
-			}
+		err := setClientFromPromOption(cluster.Name, cluster.Reader)
+		if err != nil {
+			logger.Errorf("failed to setClientFromPromOption: %v", err)
+			return err
 		}
 		return nil
 	}

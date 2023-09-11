@@ -42,6 +42,12 @@ func alertHisEventsList(c *gin.Context) {
 		cates = strings.Split(cate, ",")
 	}
 
+	user := c.MustGet("user").(*models.User)
+	abbr := strings.ToUpper(string(user.CompanyAbbr[0])) + user.CompanyAbbr[1:]
+	if !user.IsAdmin() {
+		clusters = append(clusters, abbr)
+	}
+
 	total, err := models.AlertHisEventTotal(prod, busiGroupId, stime, etime, severity, recovered, clusters, cates, query)
 	ginx.Dangerous(err)
 

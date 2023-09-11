@@ -128,21 +128,19 @@ func (w WriterType) Post(req []byte, headers ...map[string]string) error {
 
 type WritersType struct {
 	globalOpt config.WriterGlobalOpt
-	backends  map[string]WriterType
+	backends  map[string]map[string]WriterType
 	queues    map[string]map[int]*SafeListLimited
 }
 
-func (ws *WritersType) Put(name string, writer WriterType) {
-	ws.backends[name] = writer
+func (ws *WritersType) Put(cluster, name string, writer WriterType) {
+	if _, ok := Writers.backends[cluster]; !ok {
+		Writers.backends[cluster] = make(map[string]WriterType)
+	}
+	ws.backends[cluster][name] = writer
 }
 
-func (ws *WritersType) PushSample(ident string, v interface{}, clusters ...string) {
+func (ws *WritersType) PushSample(ident string, v interface{}, cluster string) {
 	hashkey := crc32.ChecksumIEEE([]byte(ident)) % uint32(ws.globalOpt.QueueCount)
-
-	cluster := config.C.ClusterName
-	if len(clusters) > 0 {
-		cluster = clusters[0]
-	}
 
 	if _, ok := ws.queues[cluster]; !ok {
 		// 待写入的集群不存在
@@ -167,85 +165,84 @@ func (ws *WritersType) StartConsumer(index int, ch *SafeListLimited, clusterName
 			continue
 		}
 
-		for key := range ws.backends {
-			if ws.backends[key].Opts.ClusterName != clusterName {
-				continue
+		if backends, ok := ws.backends[clusterName]; ok {
+			for _, opt := range backends {
+				go opt.Write(clusterName, index, series)
 			}
-			go ws.backends[key].Write(clusterName, index, series)
 		}
 	}
 }
 
 func NewWriters() WritersType {
 	return WritersType{
-		backends: make(map[string]WriterType),
+		backends: make(map[string]map[string]WriterType),
 	}
 }
 
 var Writers = NewWriters()
 
-func Init(opts []config.WriterOptions, globalOpt config.WriterGlobalOpt) error {
+func InitWriters(clusters []config.Clusters, globalOpt config.WriterGlobalOpt) error {
 	Writers.globalOpt = globalOpt
 	Writers.queues = make(map[string]map[int]*SafeListLimited)
-	for _, opt := range opts {
-		if _, ok := Writers.queues[opt.ClusterName]; !ok {
-			Writers.queues[opt.ClusterName] = make(map[int]*SafeListLimited)
+
+	for _, cluster := range clusters {
+		clusterName := cluster.Name
+		// init queues
+		if _, ok := Writers.queues[clusterName]; !ok {
+			Writers.queues[clusterName] = make(map[int]*SafeListLimited)
 			for i := 0; i < globalOpt.QueueCount; i++ {
-				Writers.queues[opt.ClusterName][i] = NewSafeListLimited(Writers.globalOpt.QueueMaxSize)
-				go Writers.StartConsumer(i, Writers.queues[opt.ClusterName][i], opt.ClusterName)
+				Writers.queues[clusterName][i] = NewSafeListLimited(Writers.globalOpt.QueueMaxSize)
+				go Writers.StartConsumer(i, Writers.queues[clusterName][i], clusterName)
 			}
 		}
-	}
 
+		// init client
+		for _, opt := range cluster.Writers {
+			cli, err := api.NewClient(api.Config{
+				Address: opt.Url,
+				RoundTripper: &http.Transport{
+					// TLSClientConfig: tlsConfig,
+					Proxy: http.ProxyFromEnvironment,
+					DialContext: (&net.Dialer{
+						Timeout:   time.Duration(opt.DialTimeout) * time.Millisecond,
+						KeepAlive: time.Duration(opt.KeepAlive) * time.Millisecond,
+					}).DialContext,
+					ResponseHeaderTimeout: time.Duration(opt.Timeout) * time.Millisecond,
+					TLSHandshakeTimeout:   time.Duration(opt.TLSHandshakeTimeout) * time.Millisecond,
+					ExpectContinueTimeout: time.Duration(opt.ExpectContinueTimeout) * time.Millisecond,
+					MaxConnsPerHost:       opt.MaxConnsPerHost,
+					MaxIdleConns:          opt.MaxIdleConns,
+					MaxIdleConnsPerHost:   opt.MaxIdleConnsPerHost,
+					IdleConnTimeout:       time.Duration(opt.IdleConnTimeout) * time.Millisecond,
+				},
+			})
+
+			if err != nil {
+				return err
+			}
+
+			writer := WriterType{
+				Opts:   opt,
+				Client: cli,
+			}
+
+			Writers.Put(clusterName, opt.Url, writer)
+		}
+	}
 	go reportChanSize()
-
-	for i := 0; i < len(opts); i++ {
-		cli, err := api.NewClient(api.Config{
-			Address: opts[i].Url,
-			RoundTripper: &http.Transport{
-				// TLSClientConfig: tlsConfig,
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   time.Duration(opts[i].DialTimeout) * time.Millisecond,
-					KeepAlive: time.Duration(opts[i].KeepAlive) * time.Millisecond,
-				}).DialContext,
-				ResponseHeaderTimeout: time.Duration(opts[i].Timeout) * time.Millisecond,
-				TLSHandshakeTimeout:   time.Duration(opts[i].TLSHandshakeTimeout) * time.Millisecond,
-				ExpectContinueTimeout: time.Duration(opts[i].ExpectContinueTimeout) * time.Millisecond,
-				MaxConnsPerHost:       opts[i].MaxConnsPerHost,
-				MaxIdleConns:          opts[i].MaxIdleConns,
-				MaxIdleConnsPerHost:   opts[i].MaxIdleConnsPerHost,
-				IdleConnTimeout:       time.Duration(opts[i].IdleConnTimeout) * time.Millisecond,
-			},
-		})
-
-		if err != nil {
-			return err
-		}
-
-		writer := WriterType{
-			Opts:   opts[i],
-			Client: cli,
-		}
-
-		Writers.Put(opts[i].Url, writer)
-	}
-
 	return nil
 }
 
 func reportChanSize() {
-	clusterName := config.C.ClusterName
-	if clusterName == "" {
-		return
-	}
-
 	for {
 		time.Sleep(time.Second * 3)
-		for cluster, m := range Writers.queues {
+		for clusterName, m := range Writers.queues {
+			if clusterName == "" {
+				continue
+			}
 			for i, c := range m {
 				size := c.Len()
-				promstat.GaugeSampleQueueSize.WithLabelValues(cluster, fmt.Sprint(i)).Set(float64(size))
+				promstat.GaugeSampleQueueSize.WithLabelValues(clusterName, fmt.Sprint(i)).Set(float64(size))
 			}
 		}
 	}
