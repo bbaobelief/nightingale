@@ -3,7 +3,6 @@ package idents
 import (
 	"context"
 	"fmt"
-	"github.com/didi/nightingale/v5/src/pkg/cmdb"
 	"github.com/didi/nightingale/v5/src/server/writer"
 	"strconv"
 	"time"
@@ -40,7 +39,7 @@ func loopToRedis(ctx context.Context) {
 func toClustersRedis() {
 	data := make(map[string]map[string]interface{})
 	for host, ts := range Idents.Items() {
-		cluster := cmdb.HostToCluster(host)
+		cluster := memsto.IdentToCluster(host)
 		if _, ok := data[cluster]; !ok {
 			data[cluster] = make(map[string]interface{})
 		}

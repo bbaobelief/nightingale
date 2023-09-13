@@ -3,7 +3,6 @@ package router
 import (
 	"compress/gzip"
 	"fmt"
-	"github.com/didi/nightingale/v5/src/pkg/cmdb"
 	"github.com/didi/nightingale/v5/src/server/idents"
 	promstat "github.com/didi/nightingale/v5/src/server/stat"
 	"io/ioutil"
@@ -208,7 +207,7 @@ func handleOpenTSDB(c *gin.Context) {
 			}
 		}
 
-		cluster := cmdb.HostToCluster(ident)
+		cluster := memsto.IdentToCluster(ident)
 
 		LogSample(c.Request.RemoteAddr, pt)
 		if config.C.WriterOpt.ShardingKey == "ident" {

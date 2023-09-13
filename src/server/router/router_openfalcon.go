@@ -3,7 +3,6 @@ package router
 import (
 	"compress/gzip"
 	"fmt"
-	"github.com/didi/nightingale/v5/src/pkg/cmdb"
 	promstat "github.com/didi/nightingale/v5/src/server/stat"
 	"github.com/didi/nightingale/v5/src/server/writer"
 	"io/ioutil"
@@ -214,7 +213,7 @@ func falconPush(c *gin.Context) {
 			}
 		}
 
-		cluster := cmdb.HostToCluster(ident)
+		cluster := memsto.IdentToCluster(ident)
 
 		LogSample(c.Request.RemoteAddr, pt)
 		if config.C.WriterOpt.ShardingKey == "ident" {

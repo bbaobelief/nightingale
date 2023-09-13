@@ -228,6 +228,7 @@ type Config struct {
 	Redis              storage.RedisConfig
 	DB                 ormx.DBConfig
 	WriterOpt          WriterGlobalOpt
+	IdentOpt           IdentGlobalOpt
 	Clusters           []Clusters
 	Ibex               Ibex
 }
@@ -413,6 +414,16 @@ type Ibex struct {
 	BasicAuthUser string
 	BasicAuthPass string
 	Timeout       int64
+}
+
+type IdentGlobalOpt struct {
+	DefaultCluster  string
+	Timeout         int64
+	CacheInterval   int64
+	CacheExpiration int64
+	CmdbUrl         string
+	CmdbKeyName     string
+	CmdbKeyValue    string
 }
 
 func (c *Config) IsDebugMode() bool {
