@@ -52,6 +52,12 @@ func alertCurEventsCard(c *gin.Context) {
 		cates = strings.Split(cate, ",")
 	}
 
+	user := c.MustGet("user").(*models.User)
+	abbr := strings.ToUpper(string(user.CompanyAbbr[0])) + user.CompanyAbbr[1:]
+	if !user.IsAdmin() {
+		clusters = append(clusters, abbr)
+	}
+
 	// 最多获取50000个，获取太多也没啥意义
 	list, err := models.AlertCurEventGets(prod, busiGroupId, stime, etime, severity, clusters, cates, query, 50000, 0)
 	ginx.Dangerous(err)
