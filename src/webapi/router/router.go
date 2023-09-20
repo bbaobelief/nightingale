@@ -122,8 +122,8 @@ func configRoute(r *gin.Engine, version string) {
 			pages.Any("/prometheus/*url", prometheusProxy)
 			pages.POST("/query-range-batch", promBatchQueryRange)
 		} else {
-			pages.Any("/prometheus/*url", auth(), prometheusProxy)
-			pages.POST("/query-range-batch", auth(), promBatchQueryRange)
+			pages.Any("/prometheus/*url", auth(), user(), prometheusProxy)
+			pages.POST("/query-range-batch", auth(), user(), promBatchQueryRange)
 		}
 
 		pages.GET("/version", func(c *gin.Context) {

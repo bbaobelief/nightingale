@@ -35,6 +35,14 @@ func promBatchQueryRange(c *gin.Context) {
 		ginx.Bomb(http.StatusBadRequest, "header(X-Cluster) is blank")
 	}
 
+	u := c.MustGet("user").(*models.User)
+	if !u.IsAdmin() {
+		if strings.ToLower(xcluster) != strings.ToLower(u.CompanyAbbr) {
+			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+			return
+		}
+	}
+
 	var f batchQueryForm
 	ginx.Dangerous(c.BindJSON(&f))
 
@@ -66,6 +74,14 @@ func prometheusProxy(c *gin.Context) {
 	if xcluster == "" {
 		c.String(http.StatusBadRequest, "X-Cluster missed")
 		return
+	}
+
+	u := c.MustGet("user").(*models.User)
+	if !u.IsAdmin() {
+		if strings.ToLower(xcluster) != strings.ToLower(u.CompanyAbbr) {
+			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+			return
+		}
 	}
 
 	cluster, exists := prom.Clusters.Get(xcluster)
