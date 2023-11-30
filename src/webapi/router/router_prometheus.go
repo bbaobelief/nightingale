@@ -189,25 +189,22 @@ func clustersGets(c *gin.Context) {
 	ginx.Dangerous(err)
 	// id-cluster-username
 	arr := strings.Split(metadata.UserIdentity, "-")
-	if len(arr) != 3 {
-		ginx.NewRender(c).Data(names, nil)
-		return
-	}
-
-	userid, _ := strconv.ParseInt(arr[0], 10, 64)
-	u, err := models.UserGetById(userid)
-	if err != nil {
-		ginx.NewRender(c).Data(names, nil)
-		return
-	}
-
-	if !u.IsAdmin() {
-		names = append(names, arr[1])
-	} else {
-		for i := 0; i < count; i++ {
-			names = append(names, config.C.Clusters[i].Name)
+	if len(arr) == 3 {
+		userid, _ := strconv.ParseInt(arr[0], 10, 64)
+		u, err := models.UserGetById(userid)
+		if err != nil {
+			ginx.NewRender(c).Data(names, nil)
+			return
 		}
+		if !u.IsAdmin() {
+			names = append(names, arr[1])
+		}
+		ginx.NewRender(c).Data(names, nil)
+		return
 	}
 
+	for i := 0; i < count; i++ {
+		names = append(names, config.C.Clusters[i].Name)
+	}
 	ginx.NewRender(c).Data(names, nil)
 }
