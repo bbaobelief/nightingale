@@ -42,6 +42,14 @@ func alertHisEventsList(c *gin.Context) {
 		cates = strings.Split(cate, ",")
 	}
 
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) == 3 {
+		clusters = append(clusters, arr[1])
+	}
+
 	total, err := models.AlertHisEventTotal(prod, busiGroupId, stime, etime, severity, recovered, clusters, cates, query)
 	ginx.Dangerous(err)
 

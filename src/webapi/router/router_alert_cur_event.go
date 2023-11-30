@@ -56,9 +56,7 @@ func alertCurEventsCard(c *gin.Context) {
 	ginx.Dangerous(err)
 	// id-cluster-username
 	arr := strings.Split(metadata.UserIdentity, "-")
-	if len(arr) != 3 {
-		clusters = append(clusters, "Default")
-	} else {
+	if len(arr) == 3 {
 		clusters = append(clusters, arr[1])
 	}
 
@@ -148,9 +146,7 @@ func alertCurEventsList(c *gin.Context) {
 	ginx.Dangerous(err)
 	// id-cluster-username
 	arr := strings.Split(metadata.UserIdentity, "-")
-	if len(arr) != 3 {
-		clusters = append(clusters, "Default")
-	} else {
+	if len(arr) == 3 {
 		clusters = append(clusters, arr[1])
 	}
 
