@@ -41,22 +41,19 @@ func promBatchQueryRange(c *gin.Context) {
 	ginx.Dangerous(err)
 	// id-cluster-username
 	arr := strings.Split(metadata.UserIdentity, "-")
-	if len(arr) != 3 {
-		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
-		return
-	}
-
-	userid, _ := strconv.ParseInt(arr[0], 10, 64)
-	u, err := models.UserGetById(userid)
-	if err != nil {
-		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
-		return
-	}
-
-	if !u.IsAdmin() {
-		if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+	if len(arr) == 3 {
+		userid, _ := strconv.ParseInt(arr[0], 10, 64)
+		u, err := models.UserGetById(userid)
+		if err != nil {
 			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
 			return
+		}
+
+		if !u.IsAdmin() {
+			if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+				c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+				return
+			}
 		}
 	}
 
@@ -97,22 +94,18 @@ func prometheusProxy(c *gin.Context) {
 	ginx.Dangerous(err)
 	// id-cluster-username
 	arr := strings.Split(metadata.UserIdentity, "-")
-	if len(arr) != 3 {
-		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
-		return
-	}
-
-	userid, _ := strconv.ParseInt(arr[0], 10, 64)
-	u, err := models.UserGetById(userid)
-	if err != nil {
-		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
-		return
-	}
-
-	if !u.IsAdmin() {
-		if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+	if len(arr) == 3 {
+		userid, _ := strconv.ParseInt(arr[0], 10, 64)
+		u, err := models.UserGetById(userid)
+		if err != nil {
 			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
 			return
+		}
+		if !u.IsAdmin() {
+			if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+				c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+				return
+			}
 		}
 	}
 
