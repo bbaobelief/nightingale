@@ -52,6 +52,16 @@ func alertCurEventsCard(c *gin.Context) {
 		cates = strings.Split(cate, ",")
 	}
 
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) != 3 {
+		clusters = append(clusters, "Default")
+	} else {
+		clusters = append(clusters, arr[1])
+	}
+
 	// 最多获取50000个，获取太多也没啥意义
 	list, err := models.AlertCurEventGets(prod, busiGroupId, stime, etime, severity, clusters, cates, query, 50000, 0)
 	ginx.Dangerous(err)
@@ -132,6 +142,16 @@ func alertCurEventsList(c *gin.Context) {
 	cates := []string{}
 	if cate != "$all" {
 		cates = strings.Split(cate, ",")
+	}
+
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) != 3 {
+		clusters = append(clusters, "Default")
+	} else {
+		clusters = append(clusters, arr[1])
 	}
 
 	total, err := models.AlertCurEventTotal(prod, busiGroupId, stime, etime, severity, clusters, cates, query)

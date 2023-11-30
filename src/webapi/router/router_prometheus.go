@@ -2,6 +2,8 @@ package router
 
 import (
 	"context"
+	"github.com/didi/nightingale/v5/src/models"
+	"strconv"
 
 	"net/http"
 	"net/http/httputil"
@@ -35,6 +37,29 @@ func promBatchQueryRange(c *gin.Context) {
 		ginx.Bomb(http.StatusBadRequest, "header(X-Cluster) is blank")
 	}
 
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) != 3 {
+		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+		return
+	}
+
+	userid, _ := strconv.ParseInt(arr[0], 10, 64)
+	u, err := models.UserGetById(userid)
+	if err != nil {
+		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+		return
+	}
+
+	if !u.IsAdmin() {
+		if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+			return
+		}
+	}
+
 	var f batchQueryForm
 	ginx.Dangerous(c.BindJSON(&f))
 
@@ -66,6 +91,29 @@ func prometheusProxy(c *gin.Context) {
 	if xcluster == "" {
 		c.String(http.StatusBadRequest, "X-Cluster missed")
 		return
+	}
+
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) != 3 {
+		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+		return
+	}
+
+	userid, _ := strconv.ParseInt(arr[0], 10, 64)
+	u, err := models.UserGetById(userid)
+	if err != nil {
+		c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+		return
+	}
+
+	if !u.IsAdmin() {
+		if strings.ToLower(xcluster) != strings.ToLower(arr[1]) {
+			c.String(http.StatusBadRequest, "No cluster permissions: %s", xcluster)
+			return
+		}
 	}
 
 	cluster, exists := prom.Clusters.Get(xcluster)
@@ -136,8 +184,30 @@ func prometheusProxy(c *gin.Context) {
 func clustersGets(c *gin.Context) {
 	count := len(config.C.Clusters)
 	names := make([]string, 0, count)
-	for i := 0; i < count; i++ {
-		names = append(names, config.C.Clusters[i].Name)
+
+	metadata, err := extractTokenMetadata(c.Request)
+	ginx.Dangerous(err)
+	// id-cluster-username
+	arr := strings.Split(metadata.UserIdentity, "-")
+	if len(arr) != 3 {
+		ginx.NewRender(c).Data(names, nil)
+		return
 	}
+
+	userid, _ := strconv.ParseInt(arr[0], 10, 64)
+	u, err := models.UserGetById(userid)
+	if err != nil {
+		ginx.NewRender(c).Data(names, nil)
+		return
+	}
+
+	if !u.IsAdmin() {
+		names = append(names, arr[1])
+	} else {
+		for i := 0; i < count; i++ {
+			names = append(names, config.C.Clusters[i].Name)
+		}
+	}
+
 	ginx.NewRender(c).Data(names, nil)
 }

@@ -319,8 +319,14 @@ func UserTotal(query string) (num int64, err error) {
 	return num, nil
 }
 
-func UserGets(query string, limit, offset int) ([]User, error) {
+func UserGets(query string, limit, offset int, user *User) ([]User, error) {
 	session := DB().Limit(limit).Offset(offset).Order("username")
+	if !user.IsAdmin() {
+		arr := strings.Split(user.Username, "-")
+		if len(arr) == 2 {
+			session = session.Debug().Where("username like ?", arr[0]+"-%")
+		}
+	}
 	if query != "" {
 		q := "%" + query + "%"
 		session = session.Where("username like ? or nickname like ? or phone like ? or email like ?", q, q, q, q)

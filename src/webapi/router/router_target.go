@@ -24,6 +24,14 @@ func targetGets(c *gin.Context) {
 	mins := ginx.QueryInt(c, "mins", 2)
 	clusters := queryClusters(c)
 
+	u := c.MustGet("user").(*models.User)
+	if !u.IsAdmin() {
+		arr := strings.Split(u.Username, "-")
+		if len(arr) == 2 {
+			clusters = append(clusters, arr[0])
+		}
+	}
+
 	total, err := models.TargetTotal(bgid, clusters, query)
 	ginx.Dangerous(err)
 
@@ -304,13 +312,13 @@ func targetUpdateBgid(c *gin.Context) {
 		// 把要操作的机器分成两部分，一部分是bgid为0，需要管理员分配，另一部分bgid>0，说明是业务组内部想调整
 		// 比如原来分配给didiyun的机器，didiyun的管理员想把部分机器调整到didiyun-ceph下
 		// 对于调整的这种情况，当前登录用户要对这批机器有操作权限，同时还要对目标BG有操作权限
-		orphans, err := models.IdentsFilter(f.Idents, "group_id = ?", 0)
-		ginx.Dangerous(err)
-
-		// 机器里边存在未归组的，登录用户就需要是admin
-		if len(orphans) > 0 && !user.IsAdmin() {
-			ginx.Bomb(http.StatusForbidden, "No permission. Only admin can assign BG")
-		}
+		//orphans, err := models.IdentsFilter(f.Idents, "group_id = ?", 0)
+		//ginx.Dangerous(err)
+		//
+		//// 机器里边存在未归组的，登录用户就需要是admin
+		//if len(orphans) > 0 && !user.IsAdmin() {
+		//	ginx.Bomb(http.StatusForbidden, "No permission. Only admin can assign BG")
+		//}
 
 		reBelongs, err := models.IdentsFilter(f.Idents, "group_id > ?", 0)
 		ginx.Dangerous(err)
