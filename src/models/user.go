@@ -506,11 +506,17 @@ func (u *User) BusiGroups(limit int, query string, all ...bool) ([]BusiGroup, er
 		return nil, errors.WithMessage(err, "failed to get BusiGroupIds")
 	}
 
-	if len(busiGroupIds) == 0 {
-		return lst, nil
+	//if len(busiGroupIds) == 0 {
+	//	return lst, nil
+	//}
+
+	abbr := ""
+	arr := strings.Split(u.Username, "-")
+	if len(arr) == 2 {
+		abbr = "%" + arr[0] + "%"
 	}
 
-	err = session.Where("id in ?", busiGroupIds).Where("name like ?", "%"+query+"%").Find(&lst).Error
+	err = session.Where("id in ? or name like ?", busiGroupIds, abbr).Where("name like ?", "%"+query+"%").Find(&lst).Error
 	if err != nil {
 		return nil, err
 	}
@@ -561,10 +567,16 @@ func (u *User) UserGroups(limit int, query string) ([]UserGroup, error) {
 		return nil, errors.WithMessage(err, "failed to get MyGroupIds")
 	}
 
+	abbr := ""
+	arr := strings.Split(u.Username, "-")
+	if len(arr) == 2 {
+		abbr = "%" + arr[0] + "%"
+	}
+
 	if len(ids) > 0 {
-		session = session.Where("id in ? or create_by = ?", ids, u.Username)
+		session = session.Where("id in ? or create_by = ? or name like ?", ids, u.Username, abbr)
 	} else {
-		session = session.Where("create_by = ?", u.Username)
+		session = session.Where("create_by = ? or name like ?", u.Username, abbr)
 	}
 
 	err = session.Where("name like ?", "%"+query+"%").Find(&lst).Error
